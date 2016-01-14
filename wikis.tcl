@@ -18,8 +18,9 @@ set reStrip {lähde\?|\[\d+\]|<([^<])*>|Koordinaatit:\s?}
 proc handler { nick mask hand channel args} {
         if {[channel get $channel wikis] && [onchan $nick $channel]} {
 		set args [join $args]
-		if {[llength $args] > 1} { set target [lindex $args 1]} else { set target $nick }
-		switch -nocase [lindex $args 0] {
+		if {![regexp {(!?\w+)\s?(\w+)?} $args -> command parameter]} { return }
+		if {[string length $parameter] > 0} { set target $parameter } else { set target $nick }
+		switch -nocase $command {
 			"!wikis"	{ putquick "PRIVMSG $channel :[getParagraph [getWiki] [string trim $target]]" }
 }	}	}
 
@@ -40,10 +41,9 @@ proc getParagraph {file nick} {
 	set text {}
 	foreach line $file {
 		set result [regexp -inline {<p>(.*)<\/p>} $line]
-		if {[string length [regsub -all $reStrip [join $result] {}]] > 25} { putlog "läpi meni tää [string length [regsub -all $reStrip [join $result] {}]], $result"; set text [lindex $result 1]; break }
+		if {[string length [regsub -all $reStrip [join $result] {}]] > 25} { set text [lindex $result 1]; break }
 	}
 	set text [regsub -all $reStrip $text {}]
-	putlog "textlen [string length $text], $text"
 	return [encoding convertto utf-8 [replaceContent [string map $escapes $text] $nick]]
 }
 
@@ -57,7 +57,6 @@ proc getWiki {} {
 	set meta [::http::meta $httpHandler]
 	set url "[dict get $meta Location]"
 	set url "[regsub {\/wiki\/} $url {/w/index.php?title=}]"
-	putlog "url $url"
         set httpHandler [::http::geturl $url]
         set html [split [::http::data $httpHandler] "\n"]
         set code [::http::code $httpHandler]
